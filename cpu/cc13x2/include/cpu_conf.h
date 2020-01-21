@@ -24,9 +24,11 @@
 #define __FPU_PRESENT 1U /**< Presence of FPU */
 #include "cpu_conf_cc26xx_cc13xx.h"
 
+#include "cc13x2_aon_rtc.h"
 #include "cc13x2_aux.h"
 #include "cc13x2_fcfg.h"
 #include "cc13x2_prcm.h"
+#include "cc13x2_rfc_dbell.h"
 
 #ifdef __cplusplus
 extern "C" {
