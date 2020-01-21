@@ -17,11 +17,23 @@
  * @}
  */
 
+#define ENABLE_DEBUG (1)
+#include "debug.h"
+
 #include "cpu.h"
 #include "cc13x2_rf_internal.h"
 
+cc13x2_rf_cmd_nop_t cmd_nop = {
+    .command_no = CMD_NOP,
+    .status = 0,
+    .next_op = NULL,
+    .start_time = 0,
+    .start_trigger = {0},
+    .condition = {0},
+};
+
 cc13x2_rf_cmd_prop_tx_t cmd_prop_tx = {
-    .command_id = CMD_PROP_TX,
+    .command_no = CMD_PROP_TX,
     .status = 0,
     .next_op = NULL,
     .start_time = 0,
@@ -35,20 +47,24 @@ cc13x2_rf_cmd_prop_tx_t cmd_prop_tx = {
 
 void isr_rfc_cpe1(void)
 {
+    DEBUG_PUTS("ISR_RFC_CPE1");
     cortexm_isr_end();
 }
 
 void isr_rfc_cpe0(void)
 {
+    DEBUG_PUTS("ISR_RFC_CPE0");
     cortexm_isr_end();
 }
 
 void isr_rfc_hw(void)
 {
+    DEBUG_PUTS("ISR_RFC_HW");
     cortexm_isr_end();
 }
 
 void isr_rfc_cmd_ack(void)
 {
+    DEBUG_PUTS("ISR_RFC_CMD_ACK");
     cortexm_isr_end();
 }

@@ -55,6 +55,39 @@ struct __attribute__ ((__packed__,aligned (4))) cc13x2_rf_op_s {
 };
 
 /**
+ * @name CMD_NOP
+ * @{
+ */
+#define CMD_NOP     (0x0801) /**< No operation command */
+
+typedef struct __attribute__((aligned(4))) {
+    uint16_t command_no; /**< the command ID number 0x3801 */
+    uint16_t status; /**< status of the command */
+    cc13x2_rf_op_t *next_op; /**< next operation to run after this operation */
+    ratmr_t start_time; /**< absolute or relative start time */
+    struct {
+        uint8_t trigger_type:4; /**< the type of trigger */
+        uint8_t ena_cmd:1; /**< 0: no alternative trigger command, 1:
+                                CMD_TRIGGER can be used as an alternative
+                                trigger */
+        uint8_t trigger_no:2; /**< the trigger number of the CMD_TRIGGER
+                                   command that triggers this action */
+        uint8_t past_trig:1; /**< 0: a trigger in the past is never triggered,
+                                  or for start of commands, give an error.
+                                  1: a trigger in the past is triggered as
+                                  soon as possible */
+    } start_trigger; /**< identification of the trigger that starts the
+                          operation */
+    struct {
+        uint8_t rule:4; /**< condition for running next command */
+        uint8_t skip:4; /**< number of skips + 1 if the rule involves skipping. */
+    } condition; /**< condition for next command */
+} cc13x2_rf_cmd_nop_t;
+
+extern cc13x2_rf_cmd_nop_t cmd_nop;
+/** @} */
+
+/**
  * @name CMD_PROP_TX
  *
  * @{
@@ -65,7 +98,7 @@ struct __attribute__ ((__packed__,aligned (4))) cc13x2_rf_op_s {
  * @brief           Proprietary Mode Transmit Command
  */
 typedef struct __attribute__((aligned(4))) {
-    uint16_t command_id; /**< the command ID number 0x3801 */
+    uint16_t command_no; /**< the command ID number 0x3801 */
     uint16_t status; /**< status of the command */
     cc13x2_rf_op_t *next_op; /**< next operation to run after this operation */
     ratmr_t start_time; /**< absolute or relative start time */
