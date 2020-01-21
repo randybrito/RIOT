@@ -77,6 +77,22 @@ struct __attribute__ ((__packed__,aligned (4))) cc13x2_rf_op_s {
 };
 
 /**
+ * @name CMD_SET_TX_POWER
+ * @{
+ */
+
+#define CMD_SET_TX_POWER (0x0010) /**< Set TX power */
+
+/**
+ * @brief           Set TX Power
+ */
+typedef struct __attribute__((aligned(4))) {
+    uint16_t command_no; /**< the command ID number */
+    uint16_t tx_power; /**< new TX power setting */
+} cc13x2_rf_cmd_set_tx_power_t;
+/** @} */
+
+/**
  * @name CMD_PROP_TX
  *
  * @{
@@ -121,6 +137,11 @@ typedef struct __attribute__((aligned(4))) {
 
 extern cc13x2_rf_cmd_prop_tx_t cmd_prop_tx;
 /** @} */
+
+/**
+ * @brief           Execute an immediate command in the RF Core.
+ */
+int cc13x2_run_immediate_command(void *command, uint32_t* rawstatus);
 
 #ifdef __cplusplus
 }
