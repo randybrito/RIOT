@@ -25,6 +25,28 @@ extern "C" {
 
 typedef uint32_t ratmr_t; /**< RAT timer */
 
+/**
+ * @name            Definitions for trigger types
+ * @{
+ */
+#define TRIG_NOW (0) /**< Triggers immediately */
+#define TRIG_NEVER (1) /**< Never trigs */
+#define TRIG_ABSTIME (2) /**< Trigs at an absolute time */
+#define TRIG_REL_SUBMIT (3) /**< Trigs at a time relative to the command was submitted */
+#define TRIG_REL_START (4) /**< Trigs at a time relative to the command started */
+#define TRIG_REL_PREVSTART (5) /**< Trigs at a time relative to the previous command in the chain
+                                    started */
+#define TRIG_REL_FIRSTSTART (6) /**< Trigs at a time relative to the first command in the chain
+                                     started */
+#define TRIG_REL_PREVEND (7) /**< Trigs at a time relative to the previous command in the chain
+                                  ended */
+#define TRIG_REL_EVT1 (8) /**< Trigs at a time relative to the context defined "Event 1" */
+#define TRIG_REL_EVT2 (9) /**< Trigs at a time relative to the context defined "Event 2" */
+#define TRIG_EXTERNAL (10) /**< Trigs at an external event to the radio timer */
+#define TRIG_PAST_BM (0x80) /**< Bitmask for setting pastTrig bit in order to trig immediately if
+                                 trigger happened in the past */
+/** @} */
+
 typedef struct cc13x2_rf_op_s cc13x2_rf_op_t; /**< Radio operation command format */
 
 /**
@@ -53,39 +75,6 @@ struct __attribute__ ((__packed__,aligned (4))) cc13x2_rf_op_s {
         uint8_t skip:4; /**< number of skips + 1 if the rule involves skipping. */
     } condition; /**< condition for next command */
 };
-
-/**
- * @name CMD_NOP
- * @{
- */
-#define CMD_NOP     (0x0801) /**< No operation command */
-
-typedef struct __attribute__((aligned(4))) {
-    uint16_t command_no; /**< the command ID number 0x3801 */
-    uint16_t status; /**< status of the command */
-    cc13x2_rf_op_t *next_op; /**< next operation to run after this operation */
-    ratmr_t start_time; /**< absolute or relative start time */
-    struct {
-        uint8_t trigger_type:4; /**< the type of trigger */
-        uint8_t ena_cmd:1; /**< 0: no alternative trigger command, 1:
-                                CMD_TRIGGER can be used as an alternative
-                                trigger */
-        uint8_t trigger_no:2; /**< the trigger number of the CMD_TRIGGER
-                                   command that triggers this action */
-        uint8_t past_trig:1; /**< 0: a trigger in the past is never triggered,
-                                  or for start of commands, give an error.
-                                  1: a trigger in the past is triggered as
-                                  soon as possible */
-    } start_trigger; /**< identification of the trigger that starts the
-                          operation */
-    struct {
-        uint8_t rule:4; /**< condition for running next command */
-        uint8_t skip:4; /**< number of skips + 1 if the rule involves skipping. */
-    } condition; /**< condition for next command */
-} cc13x2_rf_cmd_nop_t;
-
-extern cc13x2_rf_cmd_nop_t cmd_nop;
-/** @} */
 
 /**
  * @name CMD_PROP_TX
