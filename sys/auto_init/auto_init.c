@@ -234,6 +234,11 @@ void auto_init(void)
     auto_init_cc110x();
 #endif
 
+#ifdef MODULE_CC13X2_RF
+    extern void auto_init_cc13x2_rf(void);
+    auto_init_cc13x2_rf();
+#endif
+
 #ifdef MODULE_CC2420
     extern void auto_init_cc2420(void);
     auto_init_cc2420();
