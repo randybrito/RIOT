@@ -23,6 +23,36 @@
 #include <stdint.h>
 
 /**
+ * @brief   Turns on the radio core.
+ *
+ *          Sets up the power and resources for the radio core.
+ *          - switches the high frequency clock to the xosc crystal on
+ *            cc26x2/cc13x2.
+ *          - initializes the rx buffers and command
+ *          - powers on the radio core power domain
+ *          - enables the radio core power domain
+ *          - sets up the interrupts
+ *          - sends the ping command to the radio core to make sure it is
+ *            running
+ *
+ * @return  The value from the command status register.
+ * @retval  CMDSTA_Done The command was received.
+ */
+uint_fast8_t cc13x2_rf_power_on(void);
+
+/**
+ * @brief   Turns off the radio core.
+ *
+ *          Switches off the power and resources for the radio core.
+ *          - disables the interrupts
+ *          - disables the radio core power domain
+ *          - powers off the radio core power domain
+ *          - on cc13x2/cc26x2 switches the high frequency clock to the rcosc
+ *            to save power
+ */
+void cc13x2_rf_power_off(void);
+
+/**
  * @brief   Sends the direct abort command to the radio core.
  *
  * @return  The value from the command status register.
