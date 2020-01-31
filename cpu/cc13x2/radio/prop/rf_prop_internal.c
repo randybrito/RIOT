@@ -360,7 +360,7 @@ static uint_fast8_t rfCoreSendTransmitCmd(uint8_t *aPsdu, uint8_t aLen)
     sTransmitCmd.pktLen = aLen;
     sTransmitCmd.pPkt = aPsdu;
 
-    if (aPsdu[0] & IEEE802154_ACK_REQUEST)
+    if (aPsdu[0] & IEEE802154_FCF_ACK_REQ)
     {
         /* XXX: ack? */
     }
@@ -983,7 +983,7 @@ void cc13x2_rf_prop_get_ieee_eui64(uint8_t *aIeeeEui64)
      */
     eui64 = (uint8_t *)(CCFG_BASE + CCFG_O_IEEE_MAC_0);
 
-    for (i = 0; i < 8; i++)
+    for (i = 0; i < IEEE802154_LONG_ADDRESS_LEN; i++)
     {
         if (eui64[i] != CCFG_UNKNOWN_EUI64)
         {
@@ -991,7 +991,7 @@ void cc13x2_rf_prop_get_ieee_eui64(uint8_t *aIeeeEui64)
         }
     }
 
-    if (i >= 8)
+    if (i >= IEEE802154_LONG_ADDRESS_LEN)
     {
         /* The ccfg address was all 0xFF, switch to the fcfg */
         eui64 = (uint8_t *)(FCFG1_BASE + FCFG1_O_MAC_15_4_0);
@@ -1008,9 +1008,9 @@ void cc13x2_rf_prop_get_ieee_eui64(uint8_t *aIeeeEui64)
      * It may be easier to have the caller of this function store the IEEE
      * address in network byte order.
      */
-    for (i = 0; i < 8; i++)
+    for (i = 0; i < IEEE802154_LONG_ADDRESS_LEN; i++)
     {
-        aIeeeEui64[i] = eui64[(8 - 1) - i];
+        aIeeeEui64[i] = eui64[(IEEE802154_LONG_ADDRESS_LEN - 1) - i];
     }
 }
 
