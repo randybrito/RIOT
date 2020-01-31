@@ -51,6 +51,7 @@
 #include "random.h"
 #include "iolist.h"
 #include "rf_prop_internal.h"
+#include "cc13x2_rf_common.h"
 #include "cc13x2_rf_internal.h"
 #include "cc26xx_cc13xx_int.h"
 
@@ -70,9 +71,6 @@
 #include <inc/hw_fcfg1.h>
 #include <inc/hw_memmap.h>
 #include <inc/hw_prcm.h>
-#include <rf_patches/rf_patch_cpe_ieee_802_15_4.h>
-
-#define CC1352_RF_CMD0 0x0607
 
 /* phy state as defined by openthread */
 volatile cc13x2_PropPhyState_t _cc13x2_rf_prop_state;
@@ -171,7 +169,7 @@ static void *_irq_handler_arg;
  * Zeros out the receive and transmit buffers and sets up the data structures
  * of the receive queue.
  */
-static void rfCoreInitBufs(void)
+static void cc13x2_rf_prop_init_bufs(void)
 {
     rfc_dataEntry_t *entry;
     memset(sRxBuf0, 0, sizeof(sRxBuf0));
@@ -280,30 +278,6 @@ static void rfCoreInitReceiveParams(void)
 }
 
 /**
- * Sends the direct abort command to the radio core.
- *
- * @return The value from the command status register.
- * @retval CMDSTA_Done The command completed correctly.
- */
-static uint_fast8_t rfCoreExecuteAbortCmd(void)
-{
-    return (RFCDoorbellSendTo(CMDR_DIR_CMD(CMD_ABORT)) & 0xFF);
-}
-
-/**
- * Sends the direct ping command to the radio core.
- *
- * Check that the Radio core is alive and able to respond to commands.
- *
- * @return The value from the command status register.
- * @retval CMDSTA_Done The command completed correctly.
- */
-static uint_fast8_t rfCoreExecutePingCmd(void)
-{
-    return (RFCDoorbellSendTo(CMDR_DIR_CMD(CMD_PING)) & 0xFF);
-}
-
-/**
  * Sends the immediate clear rx queue command to the radio core.
  *
  * Uses the radio core to mark all of the entries in the receive queue as
@@ -315,7 +289,7 @@ static uint_fast8_t rfCoreExecutePingCmd(void)
  * @return The value from the command status register.
  * @retval CMDSTA_Done The command completed correctly.
  */
-static uint_fast8_t rfCoreClearReceiveQueue(dataQueue_t *aQueue)
+static uint_fast8_t cc13x2_rf_prop_clear_rx_queue(dataQueue_t *aQueue)
 {
     /* memset skipped because sClearReceiveQueueCmd has only 2 members and padding */
     sClearReceiveQueueCmd.commandNo = CMD_CLEAR_RX;
@@ -445,61 +419,6 @@ static uint_fast8_t rfCoreSendFsCmd(uint16_t frequency, uint16_t fractFreq)
 }
 
 /**
- * Enables the cpe0 and cpe1 radio interrupts.
- *
- * Enables the @ref IRQ_LAST_COMMAND_DONE and @ref IRQ_LAST_FG_COMMAND_DONE to
- * be handled by the @ref RFCCPE0IntHandler interrupt handler.
- */
-static void rfCoreSetupInt(void)
-{
-    bool interruptsWereDisabled;
-
-    assert(PRCMRfReady());
-
-    interruptsWereDisabled = IntMasterDisable();
-
-    /* Set all interrupt channels to CPE0 channel, error to CPE1 */
-    HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEISL) = IRQ_INTERNAL_ERROR;
-    HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIEN) = IRQ_LAST_COMMAND_DONE | IRQ_LAST_FG_COMMAND_DONE;
-
-    IntPendClear(INT_RFC_CPE_0);
-    IntPendClear(INT_RFC_CPE_1);
-    IntEnable(INT_RFC_CPE_0);
-    IntEnable(INT_RFC_CPE_1);
-
-    if (!interruptsWereDisabled)
-    {
-        IntMasterEnable();
-    }
-}
-
-/**
- * Disables and clears the cpe0 and cpe1 radio interrupts.
- */
-static void rfCoreStopInt(void)
-{
-    bool interruptsWereDisabled;
-
-    interruptsWereDisabled = IntMasterDisable();
-
-    /* clear and disable interrupts */
-    HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIFG) = 0x0;
-    HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIEN) = 0x0;
-
-    IntUnregister(INT_RFC_CPE_0);
-    IntUnregister(INT_RFC_CPE_1);
-    IntPendClear(INT_RFC_CPE_0);
-    IntPendClear(INT_RFC_CPE_1);
-    IntDisable(INT_RFC_CPE_0);
-    IntDisable(INT_RFC_CPE_1);
-
-    if (!interruptsWereDisabled)
-    {
-        IntMasterEnable();
-    }
-}
-
-/**
  * Turns on the radio core.
  *
  * Sets up the power and resources for the radio core.
@@ -536,7 +455,7 @@ static uint_fast8_t rfCorePowerOn(void)
     sRxDataQueue.pCurrEntry = sRxBuf0;
     sRxDataQueue.pLastEntry = NULL;
 
-    rfCoreInitBufs();
+    cc13x2_rf_prop_init_bufs();
 
     /*
      * Trigger a switch to the XOSC, so that we can subsequently use the RF FS
@@ -568,7 +487,7 @@ static uint_fast8_t rfCorePowerOn(void)
     while (!PRCMLoadGet())
         ;
 
-    rfCoreSetupInt();
+    cc13x2_rf_setup_int();
 
     if (!interruptsWereDisabled)
     {
@@ -578,11 +497,8 @@ static uint_fast8_t rfCorePowerOn(void)
     /* Let CPE boot */
     RFCClockEnable();
 
-    /* Enable ram clocks for patches */
-    RFCDoorbellSendTo(CMDR_DIR_CMD_2BYTE(CC1352_RF_CMD0, RFC_PWR_PWMCLKEN_MDMRAM | RFC_PWR_PWMCLKEN_RFERAM));
-
     /* Send ping (to verify RFCore is ready and alive) */
-    return rfCoreExecutePingCmd();
+    return cc13x2_rf_prop_execute_ping_cmd();
 }
 
 /**
@@ -596,7 +512,7 @@ static uint_fast8_t rfCorePowerOn(void)
  */
 static void rfCorePowerOff(void)
 {
-    rfCoreStopInt();
+    cc13x2_rf_stop_int();
 
     PRCMDomainDisable(PRCM_DOMAIN_RFCORE);
     PRCMLoadSet();
@@ -616,17 +532,6 @@ static void rfCorePowerOff(void)
         /* Switch the HF clock source (cc26xxware executes this from ROM) */
         OSCHfSourceSwitch();
     }
-}
-
-/**
- * Applies CPE patche to the radio.
- */
-static void rfCoreApplyPatch(void)
-{
-    rf_patch_cpe_ieee_802_15_4();
-
-    /* disable ram bus clocks */
-    RFCDoorbellSendTo(CMDR_DIR_CMD_2BYTE(CC1352_RF_CMD0, 0));
 }
 
 /**
@@ -1045,7 +950,7 @@ int_fast8_t rfSleep(void)
     }
     else if (_cc13x2_rf_prop_state == cc13x2_stateReceive)
     {
-        if (rfCoreExecuteAbortCmd() != CMDSTA_Done)
+        if (cc13x2_rf_execute_abort_cmd() != CMDSTA_Done)
         {
             error = -1;
         }
@@ -1095,13 +1000,13 @@ int_fast8_t cc13x2_rf_prop_rx_start(void)
              * we are running on the wrong channel. Either way assume the
              * caller correctly called us and abort all running commands.
              */
-            if (!(rfCoreExecuteAbortCmd() == CMDSTA_Done)) {
+            if (!(cc13x2_rf_execute_abort_cmd() == CMDSTA_Done)) {
                 error = -1;
                 goto exit;
             }
 
             /* any frames in the queue will be for the old channel */
-            if (!(rfCoreClearReceiveQueue(&sRxDataQueue) == CMDSTA_Done)) {
+            if (!(cc13x2_rf_prop_clear_rx_queue(&sRxDataQueue) == CMDSTA_Done)) {
                 error = -1;
                 goto exit;
             }
@@ -1126,7 +1031,7 @@ int_fast8_t cc13x2_rf_prop_rx_stop(void)
 
     if (_cc13x2_rf_prop_state == cc13x2_stateReceive)
     {
-        if (!(rfCoreExecuteAbortCmd() == CMDSTA_Done)) {
+        if (!(cc13x2_rf_execute_abort_cmd() == CMDSTA_Done)) {
             error = -1;
             goto exit;
         }
