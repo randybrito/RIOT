@@ -62,8 +62,6 @@
 #include <driverlib/prcm.h>
 #include <driverlib/rf_common_cmd.h>
 #include <driverlib/rf_data_entry.h>
-#include <driverlib/rf_ieee_cmd.h>
-#include <driverlib/rf_ieee_mailbox.h>
 #include <driverlib/rf_prop_mailbox.h>
 #include <driverlib/rf_mailbox.h>
 #include <driverlib/rfc.h>
@@ -133,7 +131,7 @@ static __attribute__((aligned(4))) rfc_propRxOutput_t sRfStats;
 /*
  * Two receive buffers entries with room for 1 max IEEE802.15.4 frame in each
  *
- * These will be setup in a circular buffer configuration by /ref sRxDataQueue.
+ * These will be setup in a circular buffer configuration by /ref _rx_data_queue.
  */
 #define RX_BUF_SIZE 144
 static __attribute__((aligned(4))) uint8_t sRxBuf0[RX_BUF_SIZE];
@@ -149,7 +147,7 @@ volatile unsigned sFlags;
 /*
  * The RX Data Queue used by @ref sReceiveCmd.
  */
-static __attribute__((aligned(4))) dataQueue_t sRxDataQueue = {0};
+static __attribute__((aligned(4))) dataQueue_t _rx_data_queue = {0};
 
 /*
  * OpenThread data primitives
@@ -179,22 +177,22 @@ static void cc13x2_rf_prop_init_bufs(void)
 
     entry               = (rfc_dataEntry_t *)sRxBuf0;
     entry->pNextEntry   = sRxBuf1;
-    entry->config.lenSz = DATA_ENTRY_LENSZ_BYTE;
+    entry->config.lenSz = RX_BUF_LEN_FIELD_LEN;
     entry->length       = sizeof(sRxBuf0) - sizeof(rfc_dataEntry_t);
 
     entry               = (rfc_dataEntry_t *)sRxBuf1;
     entry->pNextEntry   = sRxBuf2;
-    entry->config.lenSz = DATA_ENTRY_LENSZ_BYTE;
+    entry->config.lenSz = RX_BUF_LEN_FIELD_LEN;
     entry->length       = sizeof(sRxBuf1) - sizeof(rfc_dataEntry_t);
 
     entry               = (rfc_dataEntry_t *)sRxBuf2;
     entry->pNextEntry   = sRxBuf3;
-    entry->config.lenSz = DATA_ENTRY_LENSZ_BYTE;
+    entry->config.lenSz = RX_BUF_LEN_FIELD_LEN;
     entry->length       = sizeof(sRxBuf2) - sizeof(rfc_dataEntry_t);
 
     entry               = (rfc_dataEntry_t *)sRxBuf3;
     entry->pNextEntry   = sRxBuf0;
-    entry->config.lenSz = DATA_ENTRY_LENSZ_BYTE;
+    entry->config.lenSz = RX_BUF_LEN_FIELD_LEN;
     entry->length       = sizeof(sRxBuf3) - sizeof(rfc_dataEntry_t);
 }
 
@@ -273,7 +271,7 @@ static void rfCoreInitReceiveParams(void)
     // clang-format on
     sReceiveCmd = cReceiveCmd;
 
-    sReceiveCmd.pQueue  = &sRxDataQueue;
+    sReceiveCmd.pQueue  = &_rx_data_queue;
     sReceiveCmd.pOutput = (uint8_t *)&sRfStats;
 }
 
@@ -316,7 +314,7 @@ static uint_fast8_t rfCoreSendTransmitCmd(uint8_t *aPsdu, uint8_t aLen)
     // clang-format off
     static const rfc_CMD_PROP_TX_ADV_t cTransmitCmd =
     {
-        .commandNo                  = CMD_IEEE_TX,
+        .commandNo                  = CMD_PROP_TX_ADV,
         .status                     = IDLE,
         .startTrigger               =
         {
@@ -510,8 +508,8 @@ static uint_fast16_t rfCoreSendEnableCmd(void)
     sRadioSetupCmd.pRegOverride        = sPropOverrides;
     sRadioSetupCmd.config.frontEndMode = 0; /* differential */
     sRadioSetupCmd.config.biasMode     = 0; /* internal bias */
-    sRadioSetupCmd.centerFreq          = PROP_MODE_CENTER_FREQ;
-    sRadioSetupCmd.loDivider           = PROP_MODE_LO_DIVIDER;
+    sRadioSetupCmd.centerFreq          = CC13X2_CENTER_FREQ_SUB_GHZ;
+    sRadioSetupCmd.loDivider           = CC13X2_LO_DIVIDER_SUB_GHZ;
 
     interruptsWereDisabled = IntMasterDisable();
 
@@ -637,7 +635,7 @@ void _isr_rfc_cpe0(void)
     {
         HWREG(RFC_DBELL_NONBUF_BASE + RFC_DBELL_O_RFCPEIFG) = ~IRQ_LAST_COMMAND_DONE;
 
-        if (_cc13x2_rf_prop_state == cc13x2_stateReceive && sReceiveCmd.status != ACTIVE && sReceiveCmd.status != IEEE_SUSPENDED)
+        if (_cc13x2_rf_prop_state == cc13x2_stateReceive && sReceiveCmd.status != ACTIVE && sReceiveCmd.status != PROP_DONE_RXTIMEOUT)
         {
             /* the rx command was probably aborted to change the channel */
             _cc13x2_rf_prop_state = cc13x2_stateSleep;
@@ -730,8 +728,8 @@ int_fast8_t cc13x2_rf_prop_enable(void)
     {
 
         /* Set of RF Core data queue. Circular buffer, no last entry */
-        sRxDataQueue.pCurrEntry = sRxBuf0;
-        sRxDataQueue.pLastEntry = NULL;
+        _rx_data_queue.pCurrEntry = sRxBuf0;
+        _rx_data_queue.pLastEntry = NULL;
 
         cc13x2_rf_prop_init_bufs();
 
@@ -897,7 +895,7 @@ int_fast8_t cc13x2_rf_prop_rx_start(void)
             }
 
             /* any frames in the queue will be for the old channel */
-            if (!(cc13x2_rf_prop_clear_rx_queue(&sRxDataQueue) == CMDSTA_Done)) {
+            if (!(cc13x2_rf_prop_clear_rx_queue(&_rx_data_queue) == CMDSTA_Done)) {
                 error = -1;
                 goto exit;
             }
@@ -952,9 +950,11 @@ void cc13x2_rf_prop_set_chan(uint16_t channel)
         cc13x2_rf_prop_rx_stop();
     }
 
-    const uint32_t new_freq = ieee802154_freq(channel);
-    const uint16_t freq = (uint16_t)(new_freq / 1000);
-    const uint16_t frac = (uint16_t)(((new_freq - (freq * 1000)) * 0x10000) / 1000);
+    const uint32_t new_freq = cc13x2_rf_channel_freq(channel);
+
+    uint16_t freq;
+    uint16_t frac;
+    cc13x2_rf_freq_parts(new_freq, &freq, &frac);
 
     assert(rfCoreSendFsCmd(freq, frac) == CMDSTA_Done);
 
@@ -1022,77 +1022,97 @@ void cc13x2_rf_prop_irq_set_handler(void(*handler)(void *), void * arg)
 
 int cc13x2_rf_prop_recv(void *buf, size_t len, netdev_ieee802154_rx_info_t *rx_info)
 {
-    rfc_ieeeRxCorrCrc_t *   crcCorr;
-    rfc_dataEntryGeneral_t *curEntry, *startEntry;
-    uint8_t                 rssi;
-    (void)rssi;
-
-    startEntry = (rfc_dataEntryGeneral_t *)sRxDataQueue.pCurrEntry;
-    curEntry   = startEntry;
+    uint_fast8_t available = 0;
+    rfc_dataEntryGeneral_t *start_entry = (rfc_dataEntryGeneral_t *)_rx_data_queue.pCurrEntry;
+    rfc_dataEntryGeneral_t *cur_entry = start_entry;
 
     /* loop through receive queue */
     do {
-        uint8_t *payload = &(curEntry->data);
-
-        if (curEntry->status == DATA_ENTRY_FINISHED) {
-            uint8_t      payload_len;
-
-            /* get the information appended to the end of the frame.
-             * This array access looks like it is a fencepost error, but the
-             * first byte is the number of bytes that follow.
-             */
-            payload_len = payload[0];
-            crcCorr     = (rfc_ieeeRxCorrCrc_t *)&payload[len];
-            rssi        = payload[payload_len - 1];
-
-            if (crcCorr->status.bCrcErr == 0 && (payload_len - 2) < 144) {
-                if (!buf) {
-                    if (!len) {
-                        return payload_len;
-                    }
-                    if (len == payload_len) {
-                        /* drop packet */
-                        curEntry->status = DATA_ENTRY_PENDING;
-                        return 0;
-                    }
-                }
-
-                if (payload_len > len) {
-                    return -ENOSPC;
-                }
-
-                /* substract checksum bytes */
-                payload_len -= 2;
-
-                /* copy packet data */
-                memcpy(buf, &(payload[1]), payload_len);
-
-                /* save rx info */
-                if (rx_info) {
-                    rx_info->rssi = rssi;
-                    rx_info->lqi = crcCorr->status.corr;
-                }
-
-                curEntry->status = DATA_ENTRY_PENDING;
-
-                return payload_len;
-            }
-            else {
-                puts("recv error fcs");
-            }
-            curEntry->status = DATA_ENTRY_PENDING;
+        if (cur_entry->status == DATA_ENTRY_FINISHED ||
+            cur_entry->status == DATA_ENTRY_BUSY) {
+            available = 1;
+            break;
         }
 
-        curEntry = (rfc_dataEntryGeneral_t *)(curEntry->pNextEntry);
-    } while (curEntry != startEntry);
-    return 0;
+        cur_entry = (rfc_dataEntryGeneral_t *)(cur_entry->pNextEntry);
+    } while (cur_entry != start_entry);
+
+    if (!available) {
+        return 0;
+    }
+
+    /* wait for entry to become finished */
+    /* TOOD: timeout */
+    while (cur_entry->status == DATA_ENTRY_BUSY) {}
+
+    /*
+     * First 2 bytes in the data entry are the length.
+     * Our data entry consists of:
+     *
+     * +----------------+---------+------+-----------+--------+
+     * | Payload Length | Payload | RSSI | Timestamp | Status |
+     * +----------------+---------+------+-----------+--------+
+     *                    |          |         |         |
+     *                    |          |         |         1 byte
+     *                    |          |         4 bytes
+     *                    |          1 byte (signed)
+     *                    Payload Length
+     *
+     * This length includes all of those.
+     */
+    uint8_t *payload = &(cur_entry->data);
+    uint16_t payload_len = *((uint16_t *)payload);
+
+    if(len <= RX_BUF_METADATA_LEN) {
+        puts("cc13x2_rf_prop_recv: too short!");
+        cur_entry->status = DATA_ENTRY_PENDING;
+        return 0;
+    }
+
+    int8_t rssi = (int8_t)payload[payload_len];
+    uint8_t lqi = payload[payload_len + 5];
+
+    if (!buf) {
+        if (len == 0) {
+            return payload_len;
+        }
+        else {
+            cur_entry->status = DATA_ENTRY_PENDING;
+            return 0;
+        }
+    }
+
+    /* Check if payload is of standard size. */
+    if ((payload_len - 2) > 144) {
+        puts("cc13x2_rf_prop_recv: packet too big!");
+        cur_entry->status = DATA_ENTRY_PENDING;
+        return 0;
+    }
+
+    if (payload_len > len) {
+        return -ENOSPC;
+    }
+
+    /* Substract checksum bytes. */
+    payload_len -= 2;
+
+    /* Copy packet data. */
+    memcpy(buf, &(payload[2]), payload_len);
+
+    /* Save RX information. */
+    if (rx_info) {
+        rx_info->rssi = rssi;
+        rx_info->lqi = lqi;
+    }
+
+    return payload_len;
 }
 
 int cc13x2_rf_prop_recv_avail(void)
 {
     rfc_dataEntryGeneral_t *curEntry, *startEntry;
 
-    startEntry = (rfc_dataEntryGeneral_t *)sRxDataQueue.pCurrEntry;
+    startEntry = (rfc_dataEntryGeneral_t *)_rx_data_queue.pCurrEntry;
     curEntry   = startEntry;
 
     /* loop through receive queue */

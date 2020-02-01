@@ -61,11 +61,16 @@
 #define CCFG_UNKNOWN_EUI64 0xFF
 
 /**
+ * @brief TX output power
+ * @{
+ */
+
+/**
  * @brief   Creates a TX power entry for the default PA.
  *
- * The values for @a bias, @a gain, @a boost and @a coefficient are usually
- * measured by Texas Instruments for a specific front-end configuration. They
- * can then be obtained from SmartRF Studio.
+ *          The values for @a bias, @a gain, @a boost and @a coefficient are
+ *          usually measured by Texas Instruments for a specific front-end
+ *          configuration. They can then be obtained from SmartRF Studio.
  */
 #define DEFAULT_PA_ENTRY(bias, gain, boost, coefficient) \
         ((bias) << 0) | ((gain) << 6) | ((boost) << 8) | ((coefficient) << 9)
@@ -79,8 +84,12 @@ typedef struct output_config
     uint16_t value;
 } output_config_t;
 
+
+#if defined(CPU_MODEL_CC1312R1F3)
 /**
- * @brief     TX Power dBm lookup table
+ * @brief     TX Power dBm lookup table.
+ *
+ *            This table is auto generated from Smart RF Studio.
  */
 static const output_config_t rgOutputPower[] = {
   // The original PA value (12.5 dBm) has been rounded to an integer value.
@@ -103,65 +112,44 @@ static const output_config_t rgOutputPower[] = {
   {-15, DEFAULT_PA_ENTRY(1, 3, 0, 3) },
   {-20, DEFAULT_PA_ENTRY(0, 3, 0, 2) },
 };
+#else
+#error "Unknown CPU variant"
+#endif
 
 #define OUTPUT_CONFIG_COUNT (sizeof(rgOutputPower) / sizeof(rgOutputPower[0]))
 
-/* Max and Min Output Power in dBm */
+/**
+ * @brief   Minimum output power.
+ */
 #define OUTPUT_POWER_MIN (rgOutputPower[OUTPUT_CONFIG_COUNT - 1].dbm)
-#define OUTPUT_POWER_MAX (rgOutputPower[0].dbm)
-#define OUTPUT_POWER_UNKNOWN 0xFFFF
 
 /**
- * number of short addresses used for source matching
+ * @brief   Maximum output power.
  */
-#define CC1352_SHORTADD_SRC_MATCH_NUM 10
+#define OUTPUT_POWER_MAX (rgOutputPower[0].dbm)
+/**
+ * @brief   Unknwon (default) output power.
+ */
+#define OUTPUT_POWER_UNKNOWN 0xFFFF
+/** @} */
 
-#undef IEEE802154_DEFAULT_SUBGHZ_CHANNEL
-#define IEEE802154_DEFAULT_SUBGHZ_CHANNEL 7
+/**
+ * @brief   RF buffer fields size
+ * @{
+ */
+#define RX_BUF_LEN_FIELD_LEN (sizeof(uint16_t)) /**< Length in bytes of the length field */
 
-#if IEEE802154_DEFAULT_SUBGHZ_CHANNEL == 2 /* 470 MHz */
-#define IEEE802154_CHAN_MIN           0
-#define IEEE802154_CHAN_MAX           198
-#define IEEE802154_FREQ_SPACING       200
-#define IEEE802154_CHAN0_FREQ         470200
+#define RX_BUF_CRC_LEN       (2U) /**< Length in bytes of the CRC field. */
+#define RX_BUF_RSSI_LEN      (1U) /**< Length in bytes of the RSSI field. */
+#define RX_BUF_CORR_LEN      (1U) /**< Length in bytes of the CORR field. */
+#define RX_BUF_TIMESTAMP_LEN (4)  /**< Length in bytes of the Timestamp field. */
 
-#define PROP_MODE_CENTER_FREQ   0x01EA
-#define PROP_MODE_LO_DIVIDER    0x0A
-#elif IEEE802154_DEFAULT_SUBGHZ_CHANNEL == 3 /* 780 MHz */
-#define IEEE802154_CHAN_MIN           0
-#define IEEE802154_CHAN_MAX           38
-#define IEEE802154_FREQ_SPACING       200
-#define IEEE802154_CHAN0_FREQ         779200
-
-#define PROP_MODE_CENTER_FREQ   0x030F
-#define PROP_MODE_LO_DIVIDER    0x06
-#elif IEEE802154_DEFAULT_SUBGHZ_CHANNEL == 4 /* 863 MHz */
-#define IEEE802154_CHAN_MIN           0
-#define IEEE802154_CHAN_MAX           33
-#define IEEE802154_FREQ_SPACING       200
-#define IEEE802154_CHAN0_FREQ         863125
-
-#define PROP_MODE_CENTER_FREQ   0x0362
-#define PROP_MODE_LO_DIVIDER    0x05
-#elif IEEE802154_DEFAULT_SUBGHZ_CHANNEL == 7 /* 915 MHz */
-#define IEEE802154_CHAN_MIN           0
-#define IEEE802154_CHAN_MAX           128
-#define IEEE802154_FREQ_SPACING       200
-#define IEEE802154_CHAN0_FREQ         902200
-
-#define PROP_MODE_CENTER_FREQ   0x0393
-#define PROP_MODE_LO_DIVIDER    0x05
-#else
-#error "Sub-GHz channel not supported"
-#endif
-
-static inline uint32_t ieee802154_freq(const uint16_t chan)
-{
-    const uint32_t chan0 = IEEE802154_CHAN0_FREQ;
-    const uint32_t spacing = IEEE802154_FREQ_SPACING;
-    const uint32_t chan_min = IEEE802154_CHAN_MIN;
-    return chan0 + spacing * ((uint32_t)chan - chan_min);
-}
+/**
+ * @brief    Metadata length.
+ */
+#define RX_BUF_METADATA_LEN \
+  (RX_BUF_CRC_LEN + RX_BUF_RSSI_LEN + RX_BUF_CORR_LEN + RX_BUF_TIMESTAMP_LEN)
+/** @} */
 
 /**
  * size of length field in receive struct
