@@ -950,7 +950,7 @@ void cc13x2_rf_prop_set_chan(uint16_t channel)
         cc13x2_rf_prop_rx_stop();
     }
 
-    const uint32_t new_freq = cc13x2_rf_channel_freq(channel);
+    const uint32_t new_freq = cc13x2_rf_channel_freq_sub_ghz(channel);
 
     uint16_t freq;
     uint16_t frac;

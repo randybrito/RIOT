@@ -21,18 +21,72 @@
 #define CC13X2_RF_COMMON_H
 
 #include <stdint.h>
+#include <assert.h>
+
+#include "net/ieee802154.h"
+
+/**
+ * @brief   Channel ranges
+ * @{
+ */
+#define CC13X2_CHANNEL_MIN_SUB_GHZ  (0U)   /**< Minimum channel for Sub-GHz band */
+#define CC13X2_CHANNEL_MAX_SUB_GHZ  (198U) /**< Maximum channel for Sub-GHz band */
+/** @} */
+
+#define CC13X2_FREQ_SPACING_SUB_GHZ (200U)    /**< Frequency spacing between channels */
+#define CC13X2_BASE_FREQ_SUB_GHZ    (902200U) /**< Base frequency for the Sub-GHz band */
+
+#define CC13X2_CENTER_FREQ_SUB_GHZ  (0x0393U) /**< Center frequency for the Sub-GHz band */
+#define CC13X2_LO_DIVIDER_SUB_GHZ   (0x05U)   /**< LO divider for the Sub-GHz band */
+
+/**
+ * @brief   Calculate the channel frequency for a given channel number.
+ *
+ * @pre (@p chan >= CC13X2_CHANNEL_MIN_SUB_GHZ) && (@p chan <= CC13X2_CHANNEL_MAX_SUB_GHZ)
+ *
+ * @param[in] chan Channel number.
+ *
+ * @return Channel frequency.
+ */
+static inline uint32_t cc13x2_rf_channel_freq_sub_ghz(const uint16_t chan)
+{
+    assert(chan <= CC13X2_CHANNEL_MAX_SUB_GHZ);
+
+    const uint32_t chan0 = CC13X2_BASE_FREQ_SUB_GHZ;
+    const uint32_t spacing = CC13X2_FREQ_SPACING_SUB_GHZ;
+    const uint32_t chan_min = CC13X2_CHANNEL_MIN_SUB_GHZ;
+    return chan0 + spacing * ((uint32_t)chan - chan_min);
+}
+
+/**
+ * @brief   Get decimal and fractionary parts of a frequency
+ *
+ * @pre (@p dec != NULL) && (@p frac != NULL)
+ *
+ * @param[in] freq     The frequency.
+ * @param[out] dec     The decimal part.
+ * @param[out] frac    The fractionary part.
+ */
+static inline void cc13x2_rf_freq_parts(const uint32_t freq, uint16_t *dec, uint16_t *frac)
+{
+    assert(dec != NULL);
+    assert(frac != NULL);
+
+    *dec = (uint16_t)(freq / 1000);
+    *frac = (uint16_t)(((freq - ((*dec) * 1000)) * 0x10000) / 1000);
+}
 
 /**
  * @brief   Turns on the radio core.
  *
  *          Sets up the power and resources for the radio core.
- *          - switches the high frequency clock to the xosc crystal on
- *            cc26x2/cc13x2.
- *          - initializes the rx buffers and command
- *          - powers on the radio core power domain
- *          - enables the radio core power domain
- *          - sets up the interrupts
- *          - sends the ping command to the radio core to make sure it is
+ *          - Switches the high frequency clock to the xosc crystal on
+ *            CC26X2/CC13X2.
+ *          - Initializes the rx buffers and command
+ *          - Powers on the radio core power domain
+ *          - Enables the radio core power domain
+ *          - Sets up the interrupts
+ *          - Sends the ping command to the radio core to make sure it is
  *            running
  *
  * @return  The value from the command status register.
@@ -44,10 +98,10 @@ uint_fast8_t cc13x2_rf_power_on(void);
  * @brief   Turns off the radio core.
  *
  *          Switches off the power and resources for the radio core.
- *          - disables the interrupts
- *          - disables the radio core power domain
- *          - powers off the radio core power domain
- *          - on cc13x2/cc26x2 switches the high frequency clock to the rcosc
+ *          - Disables the interrupts
+ *          - Disables the radio core power domain
+ *          - Powers off the radio core power domain
+ *          - On CC13X2/CC26X2 switches the high frequency clock to the rcosc
  *            to save power
  */
 void cc13x2_rf_power_off(void);
