@@ -74,3 +74,6 @@ keys/
 
 # clangd language server
 .clangd/
+
+# Mac OS DS Files
+.DS_Store
