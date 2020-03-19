@@ -34,20 +34,57 @@ typedef struct {
     reg32_t ICR; /**< interrupt clear */
     reg32_t RIS; /**< raw interrupt status */
     reg32_t MIS; /**< masked interrupt status */
-    reg32_t __reserved1[0x100]; /**< meh */
+    reg32_t __reserved1[0x100]; /**< reserved */
     reg32_t TEST; /**< test mode */
     reg32_t INT_CAUS; /**< interrupt cause test mode */
-    reg32_t __reserved2[0x1f9]; /**< meh */
+    reg32_t __reserved2[0x1f9]; /**< reserved */
     reg32_t LOCK; /**< lock */
 } wdt_regs_t;
 
 /** @ingroup cpu_specific_peripheral_memory_map
   * @{
   */
-#define WDT_BASE      0x40080000 /**< WDT base address */
+#define WDT_BASE      (PERIPH_BASE + 0x80000) /**< WDT base address */
 /*@}*/
 
 #define WDT           ((wdt_regs_t *) (WDT_BASE)) /**< WDT register bank */
+
+/**
+ * @brief   WDT register values
+ * @{
+ */
+/**
+ * @brief   Interrupt enable (start WDT)
+ * @details 0h = Disable
+ *          1h = Enable
+ */
+#define WDT_CTL_INTEN     0x1
+
+/**
+ * @brief   Reset enable
+ * @details 0h = Disable
+ *          1h = Enable
+ */
+#define WDT_CTL_RESEN     0x2
+
+/**
+ * @brief   Interrupt type
+ * @details 0h = Maskable interrupt
+ *          1h = Non-maskable interrupt
+ */
+#define WDT_CTL_INTTYPE   0x4
+
+/**
+ * @brief   Stall enable
+ * @details 0h = Disable
+ *          1h = Enable
+ */
+#define WDT_TEST_STALL    0x100
+
+#define WDT_LOCK_UNLOCKED 0x0 /**< Unlocked */
+#define WDT_LOCK_LOCKED   0x1 /**< Locked */
+#define WDT_LOCK_UNLOCK   0x1ACCE551  /**< Unlocks the Watchdog Timer */
+/** @} */
 
 #ifdef __cplusplus
 } /* end extern "C" */
