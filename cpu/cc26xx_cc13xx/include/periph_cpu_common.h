@@ -41,6 +41,20 @@ extern "C" {
 #define PROVIDES_PM_SET_LOWEST_CORTEXM
 /** @} */
 
+/**
+ * @name    WDT upper and lower bound times in ms
+ * @{
+ */
+#define WDT_DIV_RATIO                  (32)   /**< Watchdog division ratio */
+#define WDT_MAX_RELOAD                 (0xFFFFFFFF)
+/* Actual Lower Limit is ~0.66 us so round up to 1 ms */
+#define NWDT_TIME_LOWER_LIMIT          (1U)
+#define NWDT_TIME_UPPER_LIMIT          (WDT_MAX_RELOAD / (((CLOCK_CORECLOCK \
+                                       / WDT_DIV_RATIO)) / 1000))
+#define WDT_HAS_STOP                   (0U)
+#define WDT_HAS_INIT                   (1U)
+/** @} */
+
 #ifndef DOXYGEN
 /**
  * @brief   Override GPIO mode values
