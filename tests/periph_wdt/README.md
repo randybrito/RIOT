@@ -2,7 +2,7 @@
 
 ## About
 
-This application allows testing the wdg peripheral. User can define the reset
+This application allows testing the wdt peripheral. User can define the reset
 time through the shell.
 
 ## Expected Result
